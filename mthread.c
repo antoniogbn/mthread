@@ -15,9 +15,16 @@
 #include <errno.h>
 #include <unistd.h>
 
+#ifdef MWIN
+#include <windows.h>
+#endif
+
+
 #define ERRO 0
 #define OK   1
+
 #define BSIZE 6
+#define NITEM 1000
 
 #define TEMPO_SLEEP 10
 
@@ -68,11 +75,11 @@ int gerar_entrada()
     int i;
     if ((arq = fopen("e.txt","wt"))==NULL)
     {
-        printf("\nERRO: criando o arquivo de entrada (e.txt)\n");
+        printf("\n>> ERRO: criando o arquivo de entrada (e.txt)\n");
         return(ERRO);
     }
 
-    for (i = 1 ; i <= 10; ++i)
+    for (i = 1 ; i <= NITEM; ++i)
     {
         fprintf(arq,"%05d\n",i);
     }
@@ -87,7 +94,7 @@ void *escrita()
 {
     int acabou = 0;
     FILE *arq;
-    printf("\nEntrei escrita");
+    printf("\n>> Iniciou Escrita");
     arq = fopen("s.txt","wt");
     while (1)
     {
@@ -105,10 +112,10 @@ void *escrita()
             if (G_terminou == 1)
             {
                 G_terminou = 0;
-                acabou = 1;    
                 fflush(arq);
                 fclose(arq);
-                printf("\nAcabou escrita!");
+                acabou = 1;    
+                printf("\n>> Terminou Escrita");
             }
             pthread_mutex_unlock(&G_p_fi);
         }
@@ -121,10 +128,9 @@ void *leitura()
 {
    int i      = 0;
    int acabou = 0;
-
    char c, buf[BSIZE];
    FILE *arq;
-   printf("\nEntrei leitura\n");
+   printf("\n>> Iniciou Leitura\n");
    arq = fopen("e.txt","rt");
 
    while (1)
@@ -148,10 +154,11 @@ void *leitura()
           { 
               G_terminou = 2;
 	      fclose(arq);
-           }
-           pthread_mutex_unlock(&G_p_fi);
+              printf("\n>> Terminou Leitura\n");
+          }
+          pthread_mutex_unlock(&G_p_fi);
        }	
-       m_usleep(TEMPO_SLEEP); // REMOVIDO TEMP
+       m_usleep(TEMPO_SLEEP); 
    }
    return(NULL);
 }
@@ -161,55 +168,50 @@ void *processamento()
     int acabou = 0;
 
     char buf[BSIZE];
-    memset(buf,0,sizeof(buf)*BSIZE);   
-
-    printf("\nEntrei processamento");
-
+    memset(buf, 0, sizeof(buf)*BSIZE);   
+    printf("\n>> Iniciou Processamento");
     int i = 0;
     while (1)
     {
         if (!acabou)
         {
-           if (i <= 0)
+           if (i <= 0) 
            {
               pthread_mutex_lock(&G_p_be);
-              if (G_qtd_be > 0)
+              i = 0;  
+              if (G_qtd_be != 0)
               {
-                 for (int x = G_qtd_be - 2; x >= 0; x--)
-                 {
-                     buf[i] = G_be[x];
-                     i++;
-                 }
+                 for (int j=G_qtd_be-2; j>=0; j--, i++)
+                     buf[i] = G_be[j];
                  buf[5] = '\0';
+                 memset(G_be, 0, sizeof(G_be)*BSIZE);   
+                 G_qtd_be = 0;
               }
-              else
-                 i = 0;  
-              memset(G_be,0,sizeof(G_be)*BSIZE);   
-              G_qtd_be = 0;
               pthread_mutex_unlock(&G_p_be);
             }
- 	    else
+ 	    else 
             {    
                 pthread_mutex_lock(&G_p_bs);
                 if (G_qtd_bs == 0)
                 {
-                    for (G_qtd_bs = 0; G_qtd_bs < i; G_qtd_bs++)
-                       G_bs[G_qtd_bs] = buf[G_qtd_bs];
-                    memset(buf,0,sizeof(buf)*BSIZE);   
+                    
+		    sprintf(G_bs,"%s",buf);	
+		    G_qtd_bs = sizeof G_bs;	
+                    memset(buf, 0, sizeof(buf)*BSIZE);   
                 }
-                pthread_mutex_unlock(&G_p_bs);
                 i = 0;
+                pthread_mutex_unlock(&G_p_bs);
             }
             pthread_mutex_lock(&G_p_fi);
             if (G_terminou == 2)
             {
-               acabou = 1;
                G_terminou = 1;
-               printf("\nAcabou Processamento!");
+               acabou = 1;
+               printf("\n>> Terminou Processamento");
             }
             pthread_mutex_unlock(&G_p_fi);
 	}
-        m_usleep(TEMPO_SLEEP); //REMOVIDO TEMP
+        m_usleep(TEMPO_SLEEP); 
     }
     return(NULL);
 }
@@ -223,7 +225,7 @@ void finalizar()
         pthread_mutex_lock(&G_p_fi);
         if (G_terminou == 0)
         {
-            printf("\nEm finalizar... Acabou mesmo!");
+            printf("\n>> Finalizou Tudo \n\n");
             nao_acabou = 0;
         }
         pthread_mutex_unlock(&G_p_fi);
@@ -258,7 +260,7 @@ int main(void)
         printf("\nFalha na Geracao do Arquivo de Entrada");
         return(1);
     }
-    printf("\n Arquivo de Entrada Criado com Sucesso !");
+    printf("\n>> Arquivo de Entrada Criado com Sucesso ");
 
 
     // chamada das pthreads
