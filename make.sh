@@ -1,2 +1,2 @@
-gcc -o mthread mthread.c -pthread
+gcc  -o mthread mthread.c -lpthread
 

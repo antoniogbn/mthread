@@ -21,7 +21,6 @@
 
 #define TEMPO_SLEEP 10
 
-
 // Variaveis globais
 
 // declaracao dos mutexes
@@ -45,8 +44,9 @@ void m_usleep(unsigned long pause)
 #ifdef MWIN
    Sleep(pause);
 #else
-   usleep(pause*1000);
+   usleep(pause*1000l);
 #endif
+
    return;
 }
 
@@ -72,9 +72,9 @@ int gerar_entrada()
         return(ERRO);
     }
 
-    for (i = 1 ; i <= 10; ++i)
+    for (i = 1 ; i <= 5; ++i)
     {
-        fprintf(arq,"%05d\n",i);
+        fprintf(arq,"%05d\0",i);
     }
 
     fflush(arq);
@@ -85,6 +85,7 @@ int gerar_entrada()
 
 void *escrita()
 {
+
     int acabou = 0;
     FILE *arq;
     printf("\nEntrei escrita");
@@ -93,123 +94,93 @@ void *escrita()
     {
         if (!acabou)
         {
-	    pthread_mutex_lock(&G_p_bs);
-            if (G_qtd_bs > 0)
-            {
-                fprintf(arq, "%s\n", G_bs);
-                memset(G_bs,0,sizeof(G_bs)*BSIZE);   
-                G_qtd_bs = 0;
-            }
-            pthread_mutex_unlock(&G_p_bs);
-            pthread_mutex_lock(&G_p_fi);
-            if (G_terminou == 1)
-            {
-                G_terminou = 0;
-                acabou = 1;    
-                fflush(arq);
-                fclose(arq);
-                printf("\nAcabou escrita!");
-            }
-            pthread_mutex_unlock(&G_p_fi);
+//           pthread_mutex_lock(&G_p_be);
+	   //if (G_tqd_be == 6)
+           //{
+              printf("\n Escreve : %s",G_be);
+	      G_qtd_be = 0;
+	   //}	
+//         pthread_mutex_unlock(&G_p_be);
+	   /*if (G_terminou == 2) // TEMP
+	      acabou = 1;	*/	
         }
+	if (G_terminou == 2)	
+	   acabou = 1;	
    }
-   return(NULL);
+    return(NULL);
 }
-
 
 void *leitura()
 {
-   int i      = 0;
-   int acabou = 0;
+    int i      = 0;
+    int acabou = 0;
+    char c, buf[BSIZE];
+    FILE *arq;
 
-   char c, buf[BSIZE];
-   FILE *arq;
-   printf("\nEntrei leitura\n");
-   arq = fopen("e.txt","rt");
+    printf("\nEntrei leitura\n");
+    arq = fopen("e.txt","rt");
 
-   while (1)
-   {
-      if (!acabou)
-      {
-         pthread_mutex_lock(&G_p_be);
-         if (G_qtd_be <= 0)
-         {
-            if (fgets(G_be, BSIZE, arq) != NULL)
-               G_qtd_be = 6;
-            else
-               acabou = 1;
-         }
-         pthread_mutex_unlock(&G_p_be);
-       }
-       else 
+    while (1)
+    {
+       if (!acabou)
        {
-          pthread_mutex_lock(&G_p_fi);	
-	  if (G_terminou == 3)
-          { 
-              G_terminou = 2;
-	      fclose(arq);
-           }
-           pthread_mutex_unlock(&G_p_fi);
-       }	
-       m_usleep(TEMPO_SLEEP); // REMOVIDO TEMP
-   }
+
+	  if (G_qtd_be == 0)
+	  {	
+             fgets(buf, BSIZE, arq);            
+	     {
+                pthread_mutex_lock(&G_p_be);
+		strcpy(G_be, buf);	
+/*		while (G_qtd_be != 0)
+		      printf("\nAguardando buffer"); 	*/
+   		G_qtd_be = 6;
+                printf("\nLeu : %s", G_be);
+                pthread_mutex_unlock(&G_p_be);
+
+	  }
+/*	  while (fgets(buf, sizeof(buf), arq) != NULL)
+          {
+             buf[strlen(buf) - 1] = '\0'; // eat the newline fgets() stores
+          }
+
+	  while ((c = fgetc(arq)) != EOF)
+          {
+	     lin[i] = c;
+	     i++;	
+	     if (i == 5)
+	     {
+		printf("\n Leu : %s",G_be);
+		i = 0;
+	     }	
+	  }	*/
+	  acabou = 1;
+       }
+       else
+       {
+	  G_terminou = 2;
+       }  		
+       m_usleep(TEMPO_SLEEP);
+    }
+
    return(NULL);
 }
 
 void *processamento()
 {
     int acabou = 0;
+    int i;
+    char aux[6];
 
-    char buf[BSIZE];
-    memset(buf,0,sizeof(buf)*BSIZE);   
+    memset((void *) aux,0,sizeof(char)*BSIZE);
 
     printf("\nEntrei processamento");
-
-    int i = 0;
     while (1)
     {
         if (!acabou)
         {
-           if (i <= 0)
-           {
-              pthread_mutex_lock(&G_p_be);
-              if (G_qtd_be > 0)
-              {
-                 for (int x = G_qtd_be - 2; x >= 0; x--)
-                 {
-                     buf[i] = G_be[x];
-                     i++;
-                 }
-                 buf[5] = '\0';
-              }
-              else
-                 i = 0;  
-              memset(G_be,0,sizeof(G_be)*BSIZE);   
-              G_qtd_be = 0;
-              pthread_mutex_unlock(&G_p_be);
-            }
- 	    else
-            {    
-                pthread_mutex_lock(&G_p_bs);
-                if (G_qtd_bs == 0)
-                {
-                    for (G_qtd_bs = 0; G_qtd_bs < i; G_qtd_bs++)
-                       G_bs[G_qtd_bs] = buf[G_qtd_bs];
-                    memset(buf,0,sizeof(buf)*BSIZE);   
-                }
-                pthread_mutex_unlock(&G_p_bs);
-                i = 0;
-            }
-            pthread_mutex_lock(&G_p_fi);
-            if (G_terminou == 2)
-            {
-               acabou = 1;
-               G_terminou = 1;
-               printf("\nAcabou Processamento!");
-            }
-            pthread_mutex_unlock(&G_p_fi);
-	}
-        m_usleep(TEMPO_SLEEP); //REMOVIDO TEMP
+            // AQUI!
+        }
+        m_usleep(TEMPO_SLEEP);
     }
     return(NULL);
 }
@@ -269,11 +240,11 @@ int main(void)
        return(0);
     }
     // cria thread de processamento
-    if (pthread_create(&T_processa,NULL,processamento,NULL))
+/*    if (pthread_create(&T_processa,NULL,leitura,NULL))
     {
        printf("\nERRO: criando thread Processa.\n");
        return(0);
-    }
+    }*/
     // cria thread de saida 
     if (pthread_create(&T_saida,NULL,escrita,NULL))
     {
@@ -282,13 +253,13 @@ int main(void)
     }
 
     // Aguarda finalizar
-//    G_terminou = 0;
+    G_terminou = 0;
     finalizar();
 
     // matar as pthreads
     pthread_kill(T_entrada,0);
-    pthread_kill(T_processa,0); 
-    pthread_kill(T_saida,0);
+//  pthread_kill(Tprocessa,0);
+//  pthread_kill(Tsaida,0);
 
     // finaliza mutexes
     fini_lock(&G_p_fi);  
