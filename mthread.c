@@ -260,7 +260,8 @@ int main(void)
         printf("\nFalha na Geracao do Arquivo de Entrada");
         return(1);
     }
-    printf("\n>> Arquivo de Entrada Criado com Sucesso ");
+    else
+        printf("\n>> Arquivo de Entrada Criado com Sucesso ");
 
 
     // chamada das pthreads
